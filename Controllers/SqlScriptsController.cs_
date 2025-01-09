@@ -1,0 +1,117 @@
+using Microsoft.AspNetCore.Mvc;
+using SqlBuilderTool.Models;
+using System;
+using System.Linq;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+
+namespace SqlBuilderTool.Controllers
+{
+    public class SqlScriptsController : Controller
+    {
+        private static List<SqlScript> _dummyScripts = new List<SqlScript>
+        {
+            new SqlScript { Id = 3000001, Name = "Select All Users", Description = "Retrieves all users from the database", Script = "SELECT * FROM Users;" },
+            new SqlScript { Id = 3000002, Name = "Insert New Product", Description = "Inserts a new product into the Products table", Script = "INSERT INTO Products (Name, Price) VALUES ('New Product', 19.99);" },
+            new SqlScript { Id = 3000003, Name = "Update Order Status", Description = "Updates the status of an order", Script = "UPDATE Orders SET Status = 'Shipped' WHERE OrderId = @OrderId;" },
+            new SqlScript { Id = 3000004, Name = "Delete Old Logs", Description = "Removes log entries older than 30 days", Script = "DELETE FROM Logs WHERE CreatedDate < DATEADD(day, -30, GETDATE());" },
+            new SqlScript { Id = 3000005, Name = "Get Product Sales", Description = "Retrieves sales data for products", Script = "SELECT p.Name, SUM(od.Quantity) AS TotalSold FROM Products p JOIN OrderDetails od ON p.ProductId = od.ProductId GROUP BY p.Name;" },
+            new SqlScript { Id = 3000001, Name = "Select All Users", Description = "Retrieves all users from the database", Script = "SELECT * FROM Users;" },
+            new SqlScript { Id = 3000002, Name = "Insert New Product", Description = "Inserts a new product into the Products table", Script = "INSERT INTO Products (Name, Price) VALUES ('New Product', 19.99);" },
+            new SqlScript { Id = 3000003, Name = "Update Order Status", Description = "Updates the status of an order", Script = "UPDATE Orders SET Status = 'Shipped' WHERE OrderId = @OrderId;" },
+            new SqlScript { Id = 3000004, Name = "Delete Old Logs", Description = "Removes log entries older than 30 days", Script = "DELETE FROM Logs WHERE CreatedDate < DATEADD(day, -30, GETDATE());" },
+            new SqlScript { Id = 3000005, Name = "Get Product Sales", Description = "Retrieves sales data for products", Script = "SELECT p.Name, SUM(od.Quantity) AS TotalSold FROM Products p JOIN OrderDetails od ON p.ProductId = od.ProductId GROUP BY p.Name;" }
+        };
+
+        public IActionResult Index()
+        {
+            return View();
+        }
+
+        public IActionResult PensionReports()
+        {
+            return View();
+        }
+
+        public IActionResult GLReports()
+        {
+            return View();
+        }
+
+        public IActionResult Earnings()
+        {
+            return View();
+        }
+
+        public IActionResult Deductions()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public IActionResult GetScripts()
+        {
+            var draw = Request.Form["draw"].FirstOrDefault();
+            var start = Request.Form["start"].FirstOrDefault();
+            var length = Request.Form["length"].FirstOrDefault();
+            var sortColumn = Request.Form["columns[" + Request.Form["order[0][column]"].FirstOrDefault() + "][name]"].FirstOrDefault();
+            var sortColumnDirection = Request.Form["order[0][dir]"].FirstOrDefault();
+            var columnSearches = JsonConvert.DeserializeObject<Dictionary<string, string>>(Request.Form["columnSearches"].FirstOrDefault() ?? "{}");
+
+            int pageSize = length != null ? Convert.ToInt32(length) : 0;
+            int skip = start != null ? Convert.ToInt32(start) : 0;
+
+            var scripts = _dummyScripts.AsQueryable();
+
+            // Apply column-specific searches
+            if (columnSearches.ContainsKey("0") && !string.IsNullOrEmpty(columnSearches["0"]))
+                scripts = scripts.Where(s => s.Id.ToString().IndexOf(columnSearches["0"], StringComparison.OrdinalIgnoreCase) >= 0);
+            if (columnSearches.ContainsKey("1") && !string.IsNullOrEmpty(columnSearches["1"]))
+                scripts = scripts.Where(s => s.Name.IndexOf(columnSearches["1"], StringComparison.OrdinalIgnoreCase) >= 0);
+            if (columnSearches.ContainsKey("2") && !string.IsNullOrEmpty(columnSearches["2"]))
+                scripts = scripts.Where(s => s.Description.IndexOf(columnSearches["2"], StringComparison.OrdinalIgnoreCase) >= 0);
+            if (columnSearches.ContainsKey("3") && !string.IsNullOrEmpty(columnSearches["3"]))
+                scripts = scripts.Where(s => s.Script.IndexOf(columnSearches["3"], StringComparison.OrdinalIgnoreCase) >= 0);
+
+            // Apply sorting
+            if (!(string.IsNullOrEmpty(sortColumn) && string.IsNullOrEmpty(sortColumnDirection)))
+            {
+                scripts = ApplySorting(scripts, sortColumn, sortColumnDirection);
+            }
+
+            var recordsTotal = _dummyScripts.Count;
+            var data = scripts.Skip(skip).Take(pageSize).ToList();
+            var recordsFiltered = scripts.Count();
+
+            return Json(new { draw = draw, recordsFiltered = recordsFiltered, recordsTotal = recordsTotal, data = data });
+        }
+
+        private IQueryable<SqlScript> ApplySorting(IQueryable<SqlScript> scripts, string sortColumn, string sortDirection)
+        {
+            switch (sortColumn.ToLower())
+            {
+                case "id":
+                    return sortDirection == "asc" ? scripts.OrderBy(s => s.Id) : scripts.OrderByDescending(s => s.Id);
+                case "name":
+                    return sortDirection == "asc" ? scripts.OrderBy(s => s.Name) : scripts.OrderByDescending(s => s.Name);
+                case "description":
+                    return sortDirection == "asc" ? scripts.OrderBy(s => s.Description) : scripts.OrderByDescending(s => s.Description);
+                case "script":
+                    return sortDirection == "asc" ? scripts.OrderBy(s => s.Script) : scripts.OrderByDescending(s => s.Script);
+                default:
+                    return scripts;
+            }
+        }
+
+        [HttpGet]
+        public IActionResult GetScriptDetails(int id)
+        {
+            var script = _dummyScripts.FirstOrDefault(s => s.Id == id);
+            if (script == null)
+            {
+                return NotFound();
+            }
+            return Json(new { name = script.Name, script = script.Script });
+        }
+    }
+}
